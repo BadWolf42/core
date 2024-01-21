@@ -619,15 +619,17 @@ jeedom.eqLogic.drawGraphInfo = function(_eqLogicUid, _cmdId) {
         xAxis: {
           type: 'datetime',
           ordinal: false,
-          visible: false,
+          visible: true, // TODO: add option in eq config to enable/disable this
           minPadding: 0,
-          maxPadding: 0
+          maxPadding: 0,
+          labels: { y: -2}
         },
         yAxis: {
-          visible: false,
+          visible: true, // TODO: add option in eq config to enable/disable this
           min: minValue,
           max: maxValue,
-          tickPositions: [minValue, maxValue]
+          opposite: true,
+          labels: { x: -2, align: 'right' }
         },
         plotOptions: {
           column: {
