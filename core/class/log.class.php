@@ -19,12 +19,6 @@
 /* * ***************************Includes********************************* */
 require_once __DIR__ . '/../../core/php/core.inc.php';
 
-use Monolog\Formatter\LineFormatter;
-use Monolog\Handler\StreamHandler;
-use Monolog\Handler\SyslogHandler;
-use Monolog\Handler\SyslogUdpHandler;
-use Monolog\Logger;
-
 class log {
 	/*     * *************************Constantes****************************** */
 
@@ -32,8 +26,17 @@ class log {
 
 	/*     * *************************Attributs****************************** */
 
-	private static $logger = array();
+	
 	private static $config = null;
+ 	private static $level = array(
+		'debug' => 100,
+		'info'  => 200,
+		'notice' => 250,
+		'warning' => 300,
+		'error' => 400,
+		'critical' => 500,
+		'emergency' => 600
+	);
 
 	/*     * ***********************Methode static*************************** */
 
@@ -47,30 +50,10 @@ class log {
 		return $_default;
 	}
 
-	public static function getLogger($_log) {
-		if (isset(self::$logger[$_log])) {
-			return self::$logger[$_log];
-		}
-		$formatter = new LineFormatter(str_replace('\n', "\n", self::getConfig('log::formatter')),'Y-m-d H:i:s');
-		self::$logger[$_log] = new Logger($_log);
-		switch (self::getConfig('log::engine')) {
-			case 'SyslogHandler':
-				$handler = new SyslogHandler(self::getLogLevel($_log));
-				break;
-			case 'SyslogUdp':
-				$handler = new SyslogUdpHandler(config::byKey('log::syslogudphost'), config::byKey('log::syslogudpport'), config::byKey('log::syslogudpfacility'), self::getLogLevel($_log),true,'jeedom');
-				break;
-			case 'StreamHandler':
-			default:
-				$handler = new StreamHandler(self::getPathToLog($_log), self::getLogLevel($_log));
-				break;
-		}
-		$handler->setFormatter($formatter);
-		self::$logger[$_log]->pushHandler($handler);
-		return self::$logger[$_log];
-	}
-
 	public static function getLogLevel($_log) {
+		if(strpos($_log,'_') !== false){
+			$_log = explode('_',$_log)[0];
+		}
 		$specific_level = self::getConfig('log::level::' . $_log);
 		if (is_array($specific_level)) {
 			if (isset($specific_level['default']) && $specific_level['default'] == 1) {
@@ -89,13 +72,15 @@ class log {
 	}
 
 	public static function convertLogLevel($_level = 100) {
-		if ($_level > logger::EMERGENCY) {
+		if ($_level >= 600) {
 			return 'none';
 		}
-		try {
-			return strtolower(Logger::getLevelName($_level));
-		} catch (Exception $e) {
+		foreach (self::$level as $key => $value) {
+			if($value == $_level){
+				return $key;
+			}
 		}
+		return 'none';
 	}
 
 	/**
@@ -103,24 +88,26 @@ class log {
 	 * @param string $_type message type (info, debug, warning, danger)
 	 * @param string $_message message added into log
 	 */
-	public static function add($_log, $_type, $_message, $_logicalId = '') {
+   public static function add($_log, $_type, $_message, $_logicalId = '') {
 		if (trim($_message) == '') {
 			return;
 		}
-		$logger = self::getLogger($_log);
-		$action = strtolower($_type);
-		if (method_exists($logger, $action)) {
-			$logger->$action($_message);
-			try {
-				$level = Logger::toMonologLevel($_type);
-				$action = '<a href="/index.php?v=d&p=log&logfile=' . $_log . '">' . __('Log', __FILE__) . ' ' . $_log . '</a>';
-				if ($level == Logger::ERROR && self::getConfig('addMessageForErrorLog') == 1) {
-					@message::add($_log, $_message, $action, $_logicalId);
-				} elseif ($level > Logger::ALERT) {
-					@message::add($_log, $_message, $action, $_logicalId);
-				}
-			} catch (Exception $e) {
+		$level = (isset(self::$level[strtolower($_type)])) ? self::$level[strtolower($_type)] : 100;
+		if($level < self::getLogLevel($_log)){
+			return;
+		}
+		$fp = fopen(self::getPathToLog($_log), 'a');
+		fwrite($fp,'['.date('Y-m-d H:i:s').']['.strtoupper($_type).'] '.$_message."\n");  
+		fclose($fp);
+		try {
+            $action = '<a href="/index.php?v=d&p=log&logfile=' . $_log . '">' . __('Log', __FILE__) . ' ' . $_log . '</a>';
+			if ($level == 400 && self::getConfig('addMessageForErrorLog') == 1) {
+				@message::add($_log, $_message, $action, $_logicalId);
+			} elseif ($level >= 500) {
+				@message::add($_log, $_message, $action, $_logicalId);
 			}
+		} catch (Exception $e) {
+			
 		}
 	}
 
@@ -215,7 +202,7 @@ class log {
 		}
 		if (self::authorizeClearLog($_log)) {
 			$path = self::getPathToLog($_log);
-			com_shell::execute(system::getCmdSudo() . 'chmod 664 ' . $path . ' > /dev/null 2>&1; rm ' . $path . ' 2>&1 > /dev/null');
+			com_shell::execute(system::getCmdSudo() . 'chmod 664 ' . $path . ' > /dev/null 2>&1;cat /dev/null > ' . $path.';rm ' . $path . ' 2>&1 > /dev/null');
 			return true;
 		}
 	}
@@ -279,10 +266,10 @@ class log {
 	* @param int $_colored Should lines be colored (default false)
 	* @param boolean $_numbered Should lines be numbered (default true)
 	* @param int $_numStart At what number should lines number start (default 0)
-	* @param int $_max Max number of returned lines (default 4000)
+	* @param int $_max Max number of returned lines (default is config value "maxLineLog")
 	* @return array Array containing log to append to buffer and new position for next call
 	*/
-	public static function getDelta($_log = 'core', $_position = 0, $_search = '', $_colored = false, $_numbered = true, $_numStart = 0, $_max = 4000) {
+	public static function getDelta($_log = 'core', $_position = 0, $_search = '', $_colored = false, $_numbered = true, $_numStart = 0, $_max = -1) {
 		// Add path to file if needed
 		$filename = (file_exists($_log) && is_file($_log)) ? $_log : self::getPathToLog($_log);
 		// Check if log file exists and is readable
@@ -326,6 +313,10 @@ class log {
 		if ($nbLogs == 0) {
 			return array('position' => $_position, 'line' => $_numStart, 'logText' => $logText);
 		}
+		// $_max default value is configured value of "maxLineLog"
+		$_max = ($_max < 0) ? self::getConfig('maxLineLog') : $_max;
+		// $_max value is always more than DEFAULT_MAX_LINE
+		$_max = max($_max, self::DEFAULT_MAX_LINE);
 		if ($nbLogs > $_max) {
 			// If logs must be TRUNCATED, then add a message
 			$logText .= "-------------------- TRUNCATED LOG --------------------\n";
@@ -472,28 +463,25 @@ class log {
 	 */
 	public static function define_error_reporting($log_level) {
 		switch ($log_level) {
-			case logger::DEBUG:
-			case logger::INFO:
-			case logger::NOTICE:
+			case 100:
+			case 200:
+			case 250:
 				error_reporting(E_ERROR | E_WARNING | E_PARSE | E_NOTICE);
 				break;
-			case logger::WARNING:
+			case 300:
 				error_reporting(E_ERROR | E_WARNING | E_PARSE);
 				break;
-			case logger::ERROR:
+			case 400:
 				error_reporting(E_ERROR | E_PARSE);
 				break;
-			case logger::CRITICAL:
+			case 500:
 				error_reporting(E_ERROR | E_PARSE);
 				break;
-			case logger::ALERT:
-				error_reporting(E_ERROR | E_PARSE);
-				break;
-			case logger::EMERGENCY:
+			case 600:
 				error_reporting(E_ERROR | E_PARSE);
 				break;
 			default:
-				throw new Exception('log::level invalide ("' . $log_level . '")');
+				error_reporting(E_ERROR | E_PARSE);
 		}
 	}
 
@@ -501,7 +489,7 @@ class log {
 		if (self::getConfig('log::level') > 100) {
 			return $e->getMessage();
 		} else {
-			return print_r($e, true);
+			return $e->getMessage()."\n".$e->getTraceAsString();
 		}
 	}
 

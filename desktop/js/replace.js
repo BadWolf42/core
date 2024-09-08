@@ -33,8 +33,8 @@ if (!jeeFrontEnd.replace) {
       var key = null
       document.querySelectorAll('#objectFilter .objectFilterKey').forEach(_filter => {
         if (_filter.checked) {
-          key = _filter.getAttribute('data-key')
-          if (key == '') key = null
+          key = parseInt(_filter.getAttribute('data-key'))
+          if (isNaN(key)) key = null
           jeeP.filteredObjects.push(key)
         }
       })
@@ -532,9 +532,12 @@ document.getElementById('eqSource').addEventListener('click', function(event) {
   }
 })
 
-document.getElementById('eqSource').addEventListener('mouseup', function(event) {
+document.getElementById('eqSource').addEventListener('change', function(event) {
   var _target = null
   if (_target = event.target.closest('select.selectEqReplace')) {
+    if(_target.closest('select.selectEqReplace').value == ''){
+     	return; 
+    }
     jeeP.selectReplacerEqlogic(_target.closest('select.selectEqReplace'))
     return
   }

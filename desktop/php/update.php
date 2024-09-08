@@ -6,10 +6,9 @@ if (strtotime(config::byKey('update::lastCheck')) < (strtotime('now -120min'))) 
 	try {
 		update::checkAllUpdate();
 	} catch (\Exception $e) {
-		echo '<div class="alert alert-danger">{{Erreur sur la vérification des mises à jour :}}' . ' ' . $e->getMessage() . '</div>';
+		echo '<div class="alert alert-danger">{{Erreur sur la vérification des mises à jour :}}' . ' ' . log::exception($e) . '</div>';
 	}
 }
-
 $hardware = jeedom::getHardwareName();
 $distrib = system::getDistrib();
 $coreRemoteVersion = update::byLogicalId('jeedom')->getRemoteVersion();
@@ -37,7 +36,7 @@ if ($coreRemoteVersion >= '4.2' && $distrib == 'debian') {
 	}
 }
 $logUpdate = log::getLastLine('update');
-if (strpos($logUpdate, 'END UPDATE')) {
+if (strpos($logUpdate, 'END UPDATE') || count(system::ps('install/update.php', 'sudo')) == 0) {
 	sendVarToJS('jeephp2js.isUpdating', '0');
 } else {
 	sendVarToJS('jeephp2js.isUpdating', '1');
@@ -80,9 +79,9 @@ if (strpos($logUpdate, 'END UPDATE')) {
 						<tr>
 							<th>{{Etat}}</th>
 							<th>{{Nom}}</th>
-							<th data-type="date" data-format="YYYY-MM-DD hh:mm:ss">{{Version installée}}</th>
-							<th data-type="date" data-format="YYYY-MM-DD hh:mm:ss">{{Dernière version}}</th>
-							<th data-type="date" data-format="YYYY-MM-DD hh:mm:ss">{{Mise à jour faite le}}</th>
+							<th>{{Version installée}}</th>
+							<th>{{Dernière version}}</th>
+							<th>{{Mise à jour faite le}}</th>
 							<th data-type="checkbox">{{Options}}</th>
 							<th data-sortable="false">{{Actions}}</th>
 						</tr>
@@ -159,7 +158,7 @@ if (strpos($logUpdate, 'END UPDATE')) {
 						</div>
 						<div class="form-group">
 							<label class="col-xs-6 control-label"> {{Mettre à jour le Core}}
-								<sup><i class="fas fa-question-circle" data-title="{{Même sans mise à jour signalée, la Core sera mis à jour.}}"></i></sup>
+								<sup><i class="fas fa-question-circle" data-title="{{Même sans mise à jour signalée, le Core sera mis à jour.}}"></i></sup>
 							</label>
 							<div class="col-xs-4">
 								<input type="checkbox" class="updateOption" data-l1key="core" checked /><i class="fas fa-pen-alt"></i>
@@ -176,7 +175,7 @@ if (strpos($logUpdate, 'END UPDATE')) {
 						<label><i class="fas fa-tasks"></i> Plugins</label>
 						<div class="form-group">
 							<label class="col-xs-6 control-label"> {{Mettre à jour les plugins}}
-								<sup><i class="fas fa-question-circle" data-title="{{Tous les plugins ayant une mise à jour disponible seront mise à jour après le Core.}}"></i></sup>
+								<sup><i class="fas fa-question-circle" data-title="{{Tous les plugins ayant une mise à jour disponible seront mis à jour après le Core.}}"></i></sup>
 							</label>
 							<div class="col-xs-4">
 								<input type="checkbox" class="updateOption" data-l1key="plugins" checked /><i class="fas fa-pen-alt"></i>

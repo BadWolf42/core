@@ -102,6 +102,12 @@ $synthToActions = array(
 								</div>
 							</div>
 							<div class="form-group">
+								<label class="col-sm-3 control-label">{{Nom à afficher (si vide alors le nom de l'objet sera utilisé)}}</label>
+								<div class="col-sm-7">
+									<input class="form-control objectAttr" type="text" data-l1key="configuration" data-l2key="display_name" placeholder="{{Nom à afficher}}" />
+								</div>
+							</div>
+							<div class="form-group">
 								<label class="col-sm-3 control-label">{{Objet parent}}</label>
 								<div class="col-sm-7">
 									<select class="form-control objectAttr" data-l1key="father_id">
@@ -216,6 +222,9 @@ $synthToActions = array(
 											case 'input':
 												$spAttr .= '<input class="form-control objectAttr" data-l1key="configuration" data-l2key="plugin::' . $plugin->getId() . '::' . $key . '"/>';
 												break;
+											case 'checkbox':
+												$spAttr .= '<input type="checkbox" class="form-control objectAttr" data-l1key="configuration" data-l2key="plugin::' . $plugin->getId() . '::' . $key . '"/>';
+												break;
 											case 'number':
 												$spAttr .= '<input type="number" class="form-control objectAttr" data-l1key="configuration" data-l2key="plugin::' . $plugin->getId() . '::' . $key . '" min="' . (isset($config['min']) ? $config['min'] : '') . '" max="' . (isset($config['max']) ? $config['max'] : '') . '" />';
 												break;
@@ -289,7 +298,7 @@ $synthToActions = array(
 							<div class="form-group">
 								<div class="col-sm-7 col-sm-offset-3 objectImg">
 									<a class="btn btn-sm btn-danger" id="bt_removeBackgroundImage" style="position:absolute;bottom:0;"><i class="fas fa-trash"></i> {{Enlever l'image}}</a>
-									<img class="img-responsive" src="" width="240px" />
+									<img class="img-responsive" src="" width="240px" style="min-height : 50px" />
 								</div>
 							</div>
 							<div class="form-group">
@@ -313,7 +322,7 @@ $synthToActions = array(
 			<div role="tabpanel" class="tab-pane" id="summarytab">
 				<?php
 				if (count($config_objSummary) == 0) {
-					echo '<div class="alert alert-danger">{{Vous n\'avez aucun résumé de créé. Allez dans l\'administration de}} ' . config::byKey('product_name') . ' {{-> Configuration -> onglet Résumés.}}</div>';
+					echo '<div class="alert alert-danger">{{Aucun résumé n\'est créé. Allez dans l\'administration de}} ' . config::byKey('product_name') . ' {{-> Configuration -> onglet Résumés.}}</div>';
 				} else {
 
 				?>
