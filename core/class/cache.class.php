@@ -323,23 +323,43 @@ class FileCache {
 
 	public static function all(){
 		$return = array();
-		foreach (ls(jeedom::getTmpFolder('cache'), '*',false,array('files')) as $file) {
-			$return[] = self::fetch(base64_decode($file));
+		foreach (ls(jeedom::getTmpFolder('cache'), '*/*', false, array('files')) as $file) {
+			$filepath = jeedom::getTmpFolder('cache') . '/' . $file;
+			$return[] = unserialize(file_get_contents($filepath));
 		}
 		return $return;
 	}
 
 	public static function clean(){
-		foreach (ls(jeedom::getTmpFolder('cache'), '*',false,array('files')) as $file) {
-			$cache = unserialize(file_get_contents(jeedom::getTmpFolder('cache').'/'.$file));
+		foreach (ls(jeedom::getTmpFolder('cache'), '*/*', false, array('files')) as $file) {
+			$filepath = jeedom::getTmpFolder('cache') . '/' . $file;
+			$cache = unserialize(file_get_contents($filepath));
 			if($cache->getLifetime() > 0 && ($cache->getTimestamp() + $cache->getLifetime()) < strtotime('now')){
-				unlink(jeedom::getTmpFolder('cache').'/'.$file);
+				unlink($filepath);
 			}
 		}
 	}
 
+	protected static function getDirName($_key) {
+		$folder = substr(hash('sha256', '[' . $_key . '][1]'), 0, 2);
+		return jeedom::getTmpFolder('cache') . '/' . $folder;
+	}
+
+	protected static function getFileName($_key) {
+		$filename = bin2hex('[' . $_key . '][1]') . ".doctrinecache.data";
+		if ($_key === '' || strlen($filename) > 255) { // If $filename is too long
+			return '_' . hash('sha256', '[' . $_key . '][1]') . ".doctrinecache.data";
+		} else {
+			return $filename;
+		}
+	}
+
 	public static function fetch($_key){
-		$data = @file_get_contents(jeedom::getTmpFolder('cache').'/'.base64_encode($_key));
+		$filepath = self::getDirName($_key) . '/' . self::getFileName($_key);
+		if(file_exists($filepath)){
+			return null;
+		}
+		$data = @file_get_contents($filepath);
         if($data === false){
         	return null;
         }
@@ -348,22 +368,28 @@ class FileCache {
 			return null;
 		}
 		if($cache->getLifetime() > 0 && ($cache->getTimestamp() + $cache->getLifetime()) < strtotime('now')){
-			self::delete($_key);
+			unlink($filepath);
 			return null;
 		}
 		return $cache;
 	}
 
 	public static function delete($_key){
-		@unlink(jeedom::getTmpFolder('cache').'/'.base64_encode($_key));
+		@unlink(self::getDirName($_key) . '/' . self::getFileName($_key));
 	}
 
 	public static function deleteAll(){
-		return shell_exec(system::getCmdSudo().' rm -rf '.jeedom::getTmpFolder('cache'));
+		return shell_exec(system::getCmdSudo() . ' rm -rf ' . jeedom::getTmpFolder('cache'));
 	}
 
 	public static function save($_cache){
-		file_put_contents(jeedom::getTmpFolder('cache').'/'.base64_encode($_cache->getKey()),serialize($_cache));
+		$_key = $_cache->getKey();
+		$folder = self::getDirName($_key);
+		if (!file_exists($folder)) {
+			$cmd = 'mkdir -p ' . $folder . '; chmod -R 777 ' . $folder;
+			com_shell::execute($cmd);
+		}
+		file_put_contents($folder . '/' . self::getFileName($_key), serialize($_cache));
 	}
 
 	public static function persist() {
